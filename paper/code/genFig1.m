@@ -12,9 +12,9 @@ function genFig1
 clear; clc; close all;
 
 % set paths
-paths.smooth      = '/LOCAL/PATH/TO/SMOOTH';        % UPDATE
-paths.fieldtrip   = '/LOCAL/PATH/TO/FIELDTRIP';     % UPDATE
-paths.freesurfer  = '/LOCAL/PATH/TO/FREESURFER';    % UPDATE
+paths.smooth      =  'C:\Users\bgrau\GitHub\SMOOTH';        % UPDATE
+paths.fieldtrip   = 'C:\Matlab\toolboxes\fieldtrip';     % UPDATE
+paths.freesurfer  = 'C:\Matlab\toolboxes\fieldtrip\external\freesurfer';    % UPDATE
 paths.demoSource  = fullfile(paths.smooth, 'demo', 'source.mat');
 paths.figOut      = fullfile(paths.smooth, 'paper', 'figs', '1');
 paths.tsFile      = fullfile(paths.smooth, 'paper', 'ts.mat');

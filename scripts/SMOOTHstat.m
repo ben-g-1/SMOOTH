@@ -46,7 +46,7 @@ cfg.equalize_n       = ft_getopt(cfg, 'equalize_n',          'no');
 cfg.normalize        = ft_getopt(cfg, 'normalize',           'no');
 cfg.randmethod       = ft_getopt(cfg, 'randmethod',    'signflip');
 cfg.numrandomization = ft_getopt(cfg, 'numrandomization',    1000);
-cfg.minnbsub         = ft_getopt(cfg, 'minnbsub',               3);
+cfg.minnbsub         = ft_getopt(cfg, 'minnbsub',               3); % This seems low. Maybe there should be a warning if there are fewer than 10 subjects or so? BG
 cfg.clusteralpha     = ft_getopt(cfg, 'clusteralpha',        0.05);
 cfg.keepmaps         = ft_getopt(cfg, 'keepmaps',            'no');
 cfg.keepsurrogates   = ft_getopt(cfg, 'keepsurrogates',      'no');
@@ -75,6 +75,8 @@ allmaps = nan(nVertL+nVertR, nSubjects);
 % convert FWHM (mm) to σ (mm) for Gaussian kernel (if used)
 if strcmpi(cfg.kernel, 'gaussian')
   sigma_mm = cfg.kernelwidth/(2*sqrt(2*log(2)));   % FWHM -> σ
+  % Might be helpful to add a check here to ensure that the kernel width is not too large relative to the mesh size. BG
+  % Also verbosity could be added to inform the user of the sigma value being used- since gaussian is default, user might be unaware of transformation. BG
 elseif strcmpi(cfg.kernel, 'boxcar')
   sigma_mm = cfg.kernelwidth;                      % boxcar radius
 else
@@ -82,14 +84,14 @@ else
 end
 
 % one cache reused across subjects and hemispheres
-e2m_cache = struct('pial', struct('L', [], 'R', []), ...
-  'sphere', struct('kdtL', [], 'kdtR', []));
+e2m_cache = struct('pial', struct('L', [], 'R', []), ...  % I might refactor this into something more readable, like global_cache or similar. BG
+  'sphere', struct('kdtL', [], 'kdtR', []));              % The nested structure is maybe unnecessary? Definitely unintuitive at this point, but I'll delete this comment if it makes sense later. BG
 
 for s = 1:nSubjects
   data = varargin{s};
   dv   = data.(cfg.parameter);
   pos  = data.elec.chanpos;
-  hemi = pos(:,1) < 0;  % fsavg: L<0
+  hemi = pos(:,1) < 0;  % fsavg: L<0  I would refactor so that hemi is left_hemi or hemiL following later convention for clarity. BG
 
   % electrode to vertex smoothing
   [mapL, cacheL, idxL, e2m_cache] = elec2map_build('L', cfg, lh, sph_l, pos, dv, sigma_mm,  hemi, e2m_cache);
@@ -106,12 +108,12 @@ for s = 1:nSubjects
 
   % rank-rescale prep
   rescale_cache = struct();
-  m = isfinite(mapL);
-  rescale_cache.L = struct('mask',m,'tgt_sorted',sort(mapL(m),'ascend'), ...
-    'mu',mean(mapL(m)), 'sd',max(std(mapL(m)),eps));
-  m = isfinite(mapR);
-  rescale_cache.R = struct('mask',m,'tgt_sorted',sort(mapR(m),'ascend'), ...
-    'mu',mean(mapR(m)), 'sd',max(std(mapR(m)),eps));
+  mL = isfinite(mapL); % refactor to avoid using same variable twice BG
+  rescale_cache.L = struct('mask',mL,'tgt_sorted',sort(mapL(mL),'ascend'), ...
+    'mu',mean(mapL(mL)), 'sd',max(std(mapL(mL)),eps));
+  mR = isfinite(mapR);
+  rescale_cache.R = struct('mask',mR,'tgt_sorted',sort(mapR(mR),'ascend'), ...
+    'mu',mean(mapR(mR)), 'sd',max(std(mapR(mR)),eps));
 
   % keep for permutations
   data.elec.hemi     = hemi;
@@ -154,11 +156,14 @@ fprintf('performing cluster-based permutation testing\n')
 
 coverage = sum(isfinite(allmaps), 2);  % V × 1
 mask     = coverage < cfg.minnbsub; % vertices below min subjects excluded
+                                    % This could be made more verbose to inform the user of how many vertices were excluded based on coverage. BG
+                                    % fprintf('Excluding %d vertices with coverage below %d subjects.\n', sum(mask), cfg.minnbsub);
 
 negtailcritval = norminv(cfg.clusteralpha);
-postailcritval = norminv(1 - cfg.clusteralpha);
-posdistribution = zeros(cfg.numrandomization,1);
 negdistribution = zeros(cfg.numrandomization,1);
+
+postailcritval = norminv(1 - cfg.clusteralpha);
+posdistribution = zeros(cfg.numrandomization,1); % Mixed order bothered me... BG
 
 if strcmp(cfg.keepsurrogates, 'yes')
   surr_subj  = zeros(nSubjects, size(sph.pos,1), cfg.numrandomization);
@@ -207,7 +212,7 @@ for iter = 1:cfg.numrandomization+1
       switch lower(cfg.rankrescale)
         case 'no'
         case 'exact'
-          [~, idxL] = sort(mapL); mapL(idxL) = sort(allmaps(1:163842,s));
+          [~, idxL] = sort(mapL); mapL(idxL) = sort(allmaps(1:163842,s));  % why is this hardcoded? Throws errors with the demo script. BG
           [~, idxR] = sort(mapR); mapR(idxR) = sort(allmaps(163842+1:end,s));
 
           % % 5 mm smoothing (sphere-based) after rank rescale

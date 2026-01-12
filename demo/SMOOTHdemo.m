@@ -19,9 +19,9 @@
 clear; clc; close all;
 
 % set paths
-paths.smooth      = '/LOCAL/PATH/TO/SMOOTH';        % UPDATE
-paths.fieldtrip   = '/LOCAL/PATH/TO/FIELDTRIP';     % UPDATE
-paths.freesurfer  = '/LOCAL/PATH/TO/FREESURFER';    % UPDATE
+paths.smooth      =  'C:\Users\bgrau\GitHub\SMOOTH';        % UPDATE
+paths.fieldtrip   = 'C:\Matlab\toolboxes\fieldtrip';     % UPDATE
+paths.freesurfer  = 'C:\Matlab\toolboxes\fieldtrip\external\freesurfer';    % UPDATE
 
 % add paths
 addpath(genpath(paths.smooth))
@@ -31,8 +31,9 @@ ft_defaults
 % cortical mesh (only for visualization)
 cortex      = load_fsaverage_mesh(paths.freesurfer);
 
+disp(paths.smooth)
 % read in data
-load([paths.smooth filesep 'demo/source.mat'])  % path to example dataset
+load([paths.smooth filesep 'demo' filesep 'source.mat'])  % path to example dataset  % making both filesep helps for Windows. BG
 nsubs = numel(source);
 nchans = sum(cellfun(@(s) numel(s.label), source));
 fprintf('\nLoaded demo dataset: %d subjects, %d total electrodes.\n', nsubs, nchans);
@@ -43,13 +44,20 @@ cfg                  = [];
 cfg.keepmaps         = 'yes';
 cfg.keepsurrogates   = 'yes';
 cfg.normalize        = 'no';
-cfg.numrandomization = 500;
+cfg.numrandomization = 500;  % created array with size above 32 GB at 500 randomizations
 cfg.kernelwidth      = 35;
-cfg.rankrescale      = 'exact';
+cfg.rankrescale      = 'quantile';
 cfg.smooth           = 'sphere';
 cfg.kernel           = 'gaussian';
 cfg.fshome           = paths.freesurfer;
-stat = SMOOTHstat(cfg, source{:});
+stat = SMOOTHstat(cfg, source{:}); %threw error: 
+                                        % "Unable to perform assignment because the left and right sides have a different number of elements.
+
+                                        % Error in SMOOTHstat (line 210)
+                                        %           [~, idxL] = sort(mapL); mapL(idxL) = sort(allmaps(1:163842,s));
+
+                                        % Error in SMOOTHdemo (line 53)
+                                        % stat = SMOOTHstat(cfg, source{:});"
 t = toc;
 fprintf('SMOOTHstat completed in %.2f s.\n', t);
 
@@ -76,7 +84,7 @@ title('SMOOTH significant effects'); view([90 0])
 % data
 
 % surrogate diagnostics
-d    = SMOOTHdiag(stat);
+d    = SMOOTHdiag(stat); % Lack of verbosity made me assume this line hung. Why are all the fprintf lines in the function commented out? BG
 emp  = d.subject.spatial.BOTH.moranI.per_subject.emp(:);
 null = d.subject.spatial.BOTH.moranI.per_subject.null_mu(:);
 [~,p,~,tstat] = ttest(emp, null);  % emp vs null smoothness
